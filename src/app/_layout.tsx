@@ -1,16 +1,19 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import React from 'react';
-import { useColorScheme } from 'react-native';
+import { Stack } from "expo-router";
+import { AuthProvider } from "../context/auth-context";
+import { TodoProvider } from "../context/todo-context";
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <AuthProvider>
+      <TodoProvider>
+        <Stack screenOptions={{ headerShown: false }} >
+          <Stack.Screen name="index" options={{ title: 'Home' }} />
+          <Stack.Screen name="login" options={{ title: 'Login' }} />
+          <Stack.Screen name="register" options={{ title: 'Register' }} />
+          <Stack.Screen name="forgot-password" options={{ title: 'Forgot Password' }} />
+          <Stack.Screen name="home" options={{ title: 'Home' }} />
+        </Stack>
+      </TodoProvider>
+    </AuthProvider>
   );
 }
