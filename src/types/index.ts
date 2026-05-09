@@ -11,5 +11,6 @@ export interface Todo {
   user_id?: number;
   title: string;
   completed: number;
+  date: string; // YYYY-MM-DD
   created_at?: string;
 }

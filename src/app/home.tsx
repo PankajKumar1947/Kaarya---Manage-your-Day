@@ -1,81 +1,73 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  Modal
+} from 'react-native';
 import { AppText } from '../components/app-text';
 import { ScreenContainer } from '../components/screen-container';
+import { AddTodoModal } from '../components/todo/add-todo-modal';
+import { DateItem } from '../components/todo/date-item';
+import { TodoItem } from '../components/todo/todo-item';
 import { useAuth } from '../context/auth-context';
-import { Todo, useTodos } from '../context/todo-context';
+import { useTodos } from '../context/todo-context';
 import { Colors } from '../theme/colors';
+import { useCalendar } from '../hooks/use-calendar';
 
 export default function HomeScreen() {
-  const router = useRouter();
-  const { todos, toggleTodo } = useTodos();
+  const { todos, toggleTodo, deleteTodo, fetchTodos, addTodo, isLoading } = useTodos();
   const { user, logout } = useAuth();
-  const [selectedDateIndex, setSelectedDateIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+  
+  const {
+    currentDate,
+    selectedDateKey,
+    setSelectedDateKey,
+    monthDays,
+    changeYear,
+    setMonth,
+    goToToday,
+  } = useCalendar();
 
-  // Generate 14 days starting from today for a better horizontal scroll experience
-  const weekDays = useMemo(() => {
-    const days = [];
-    const today = new Date();
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [isMonthPickerVisible, setIsMonthPickerVisible] = useState(false);
 
-    for (let i = 0; i < 14; i++) {
-      const date = new Date();
-      date.setDate(today.getDate() + i);
-      days.push({
-        id: i.toString(),
-        dayNum: date.getDate().toString(),
-        dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        isToday: i === 0,
-        fullDate: date.toDateString()
-      });
+  useEffect(() => {
+    if (selectedDateKey) {
+      fetchTodos(selectedDateKey);
     }
-    return days;
-  }, []);
+  }, [selectedDateKey, fetchTodos]);
 
-  const renderTodoItem = ({ item }: { item: Todo }) => (
-    <TouchableOpacity
-      style={styles.todoItem}
-      onPress={() => toggleTodo(item.id)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.checkbox, item.completed && styles.checkboxChecked]}>
-        {item.completed && <Ionicons name="checkmark" size={16} color={Colors.white} />}
-      </View>
-      <AppText style={[styles.todoTitle, item.completed && styles.completedText]}>
-        {item.title}
-      </AppText>
-    </TouchableOpacity>
-  );
+  useEffect(() => {
+    if (monthDays.length > 0) {
+      const index = monthDays.findIndex(d => d.dateKey === selectedDateKey);
+      if (index !== -1) {
+        const timer = setTimeout(() => {
+          flatListRef.current?.scrollToIndex({ 
+            index, 
+            animated: true, 
+            viewPosition: 0.5 
+          });
+        }, 200);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [selectedDateKey, monthDays.length]);
 
-  const renderDateItem = ({ item, index }: { item: typeof weekDays[0], index: number }) => {
-    const isSelected = selectedDateIndex === index;
-    return (
-      <TouchableOpacity
-        style={[
-          styles.dayCircle,
-          isSelected ? styles.activeDay : styles.inactiveDay
-        ]}
-        onPress={() => setSelectedDateIndex(index)}
-        activeOpacity={0.8}
-      >
-        <AppText
-          bold
-          style={styles.dayNumText}
-          color={isSelected ? Colors.white : Colors.textPrimary}
-        >
-          {item.dayNum}
-        </AppText>
-        <AppText
-          variant="caption"
-          style={styles.dayNameText}
-          color={isSelected ? 'rgba(255,255,255,0.8)' : Colors.textSecondary}
-        >
-          {item.dayName}
-        </AppText>
-      </TouchableOpacity>
-    );
+  const handleAddTodo = async (title: string) => {
+    await addTodo(title, selectedDateKey);
   };
+
+  const handleGoToToday = () => {
+    goToToday();
+    setIsMonthPickerVisible(false);
+  };
+
+  const isAddDisabled = !selectedDateKey;
 
   return (
     <ScreenContainer style={styles.container}>
@@ -88,52 +80,145 @@ export default function HomeScreen() {
             <AppText variant="caption">Welcome back,</AppText>
             <AppText bold style={{ fontSize: 18 }}>{user?.name || 'User'}</AppText>
           </View>
-          <TouchableOpacity style={styles.calendarBtn}>
+          <TouchableOpacity 
+            style={styles.calendarBtn}
+            onPress={() => setIsMonthPickerVisible(true)}
+          >
             <Ionicons name="calendar-outline" size={24} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.daySelectorContainer}>
           <FlatList
+            ref={flatListRef}
             horizontal
-            data={weekDays}
-            renderItem={renderDateItem}
+            data={monthDays}
+            renderItem={({ item }) => (
+              <DateItem
+                dayNum={item.dayNum}
+                dayName={item.dayName}
+                isSelected={selectedDateKey === item.dateKey}
+                onPress={() => setSelectedDateKey(item.dateKey)}
+              />
+            )}
             keyExtractor={(item) => item.id}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.daySelectorList}
-            snapToInterval={86} // dayCircle width (70) + marginRight (16)
-            decelerationRate="fast"
+            onScrollToIndexFailed={(info) => {
+               flatListRef.current?.scrollToOffset({ 
+                 offset: info.averageItemLength * info.index, 
+                 animated: false 
+               });
+            }}
           />
         </View>
 
         <View style={styles.titleRow}>
-          <AppText variant="h1" style={styles.title}>My Todos</AppText>
-          <TouchableOpacity style={styles.addBtn}>
-            <Ionicons name="add" size={32} color={Colors.primary} />
+          <AppText variant="h1" style={styles.title}>My Kaarya</AppText>
+          <TouchableOpacity
+            style={[styles.addBtn, isAddDisabled && styles.disabledBtn]}
+            onPress={() => setIsAddModalVisible(true)}
+            disabled={isAddDisabled}
+          >
+            <Ionicons 
+              name="add" 
+              size={32} 
+              color={isAddDisabled ? Colors.grey : Colors.primary} 
+            />
           </TouchableOpacity>
         </View>
       </View>
 
-      <FlatList
-        data={todos}
-        renderItem={renderTodoItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="clipboard-outline" size={64} color={Colors.grey} />
-            <AppText variant="caption" style={{ marginTop: 16 }}>No todos for today!</AppText>
-          </View>
-        }
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={todos}
+          renderItem={({ item }) => (
+            <TodoItem
+              item={item}
+              onToggle={toggleTodo}
+              onDelete={deleteTodo}
+            />
+          )}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="clipboard-outline" size={64} color={Colors.grey} />
+              <AppText variant="caption" style={{ marginTop: 16 }}>No Kaarya for this date!</AppText>
+            </View>
+          }
+        />
+      )}
+
+      <AddTodoModal
+        visible={isAddModalVisible}
+        onClose={() => setIsAddModalVisible(false)}
+        onAdd={handleAddTodo}
       />
+
+      <Modal
+        visible={isMonthPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsMonthPickerVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setIsMonthPickerVisible(false)}
+        >
+          <View style={styles.pickerContent}>
+            <View style={styles.pickerHeader}>
+                <AppText bold style={styles.pickerTitle}>Select Date</AppText>
+                <TouchableOpacity onPress={handleGoToToday} style={styles.todayBtn}>
+                    <AppText color={Colors.primary} bold>Today</AppText>
+                </TouchableOpacity>
+            </View>
+            
+            <View style={styles.yearSelector}>
+               <TouchableOpacity onPress={() => changeYear(-1)}>
+                 <Ionicons name="chevron-back" size={24} color={Colors.primary} />
+               </TouchableOpacity>
+               <AppText bold style={styles.yearText}>{currentDate.getFullYear()}</AppText>
+               <TouchableOpacity onPress={() => changeYear(1)}>
+                 <Ionicons name="chevron-forward" size={24} color={Colors.primary} />
+               </TouchableOpacity>
+            </View>
+
+            <View style={styles.monthsGrid}>
+              {Array.from({ length: 12 }).map((_, i) => {
+                const date = new Date(currentDate.getFullYear(), i, 1);
+                const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+                const isCurrent = currentDate.getMonth() === i;
+                return (
+                  <TouchableOpacity 
+                    key={i} 
+                    style={[styles.monthButton, isCurrent && styles.activeMonthButton]}
+                    onPress={() => {
+                      setMonth(i);
+                      setIsMonthPickerVisible(false);
+                    }}
+                  >
+                    <AppText color={isCurrent ? Colors.white : Colors.textPrimary}>{monthName}</AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    // Horizontal padding removed here so list can go to edges
+    flex: 1,
   },
   header: {
     paddingTop: 20,
@@ -143,14 +228,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
-    paddingHorizontal: 24,
+    paddingHorizontal: 18,
   },
   userInfo: {
     flex: 1,
     marginLeft: 12,
   },
   profileBtn: {
-    // Styling for profile
   },
   calendarBtn: {
     width: 44,
@@ -169,49 +253,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   daySelectorList: {
-    paddingHorizontal: 24,
-    paddingBottom: 8, // For shadow visibility
-  },
-  dayCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    marginRight: 16,
-  },
-  activeDay: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  inactiveDay: {
-    backgroundColor: Colors.white,
-    borderColor: Colors.inputBorder,
-  },
-  dayNameText: {
-    fontSize: 10,
-    textTransform: 'uppercase',
-    marginTop: 2,
-  },
-  dayNumText: {
-    fontSize: 20,
-    lineHeight: 22,
+    paddingHorizontal: 18,
   },
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 18,
   },
   title: {
-    marginBottom: 0,
-    fontSize: 32,
+    fontSize: 28,
   },
   addBtn: {
     width: 44,
@@ -226,47 +277,90 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
   },
+  disabledBtn: {
+    opacity: 0.5,
+    shadowOpacity: 0,
+    elevation: 0,
+    backgroundColor: Colors.inputBackground,
+  },
   listContent: {
-    paddingBottom: 40,
-    paddingHorizontal: 24,
+    paddingBottom: 20,
+    paddingHorizontal: 18,
   },
-  todoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: Colors.white,
-    borderRadius: 24,
-    marginBottom: 16,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: Colors.primary,
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
-  },
-  checkboxChecked: {
-    backgroundColor: Colors.primary,
-  },
-  todoTitle: {
-    fontSize: 16,
-    flex: 1,
-  },
-  completedText: {
-    textDecorationLine: 'line-through',
-    color: Colors.textSecondary,
   },
   emptyState: {
     alignItems: 'center',
     marginTop: 60,
     opacity: 0.5,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pickerContent: {
+    backgroundColor: Colors.white,
+    width: '85%',
+    borderRadius: 32,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 10,
+  },
+  pickerTitle: {
+    fontSize: 20,
+    color: Colors.textPrimary,
+  },
+  todayBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: Colors.background,
+  },
+  monthsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 20,
+  },
+  monthButton: {
+    width: '30%',
+    paddingVertical: 15,
+    alignItems: 'center',
+    borderRadius: 16,
+    backgroundColor: Colors.background,
+  },
+  activeMonthButton: {
+    backgroundColor: Colors.primary,
+  },
+  yearSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 30,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.inputBorder,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  yearText: {
+    fontSize: 24,
+    color: Colors.primary,
   }
 });

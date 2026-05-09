@@ -1,48 +1,60 @@
-import React, { createContext, useContext, useState } from 'react';
-
-export interface Todo {
-  id: string;
-  title: string;
-  completed: boolean;
-}
+import React, { createContext, useContext, useState, useCallback } from 'react';
+import { Todo } from '@/types';
+import { todoService } from '@/services/todo.service';
+import { useAuth } from './auth-context';
 
 interface TodoContextType {
   todos: Todo[];
-  addTodo: (title: string) => void;
-  toggleTodo: (id: string) => void;
-  deleteTodo: (id: string) => void;
+  isLoading: boolean;
+  fetchTodos: (date: string) => Promise<void>;
+  addTodo: (title: string, date: string) => Promise<void>;
+  toggleTodo: (id: number) => Promise<void>;
+  deleteTodo: (id: number) => Promise<void>;
 }
 
 const TodoContext = createContext<TodoContextType | undefined>(undefined);
 
 export const TodoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [todos, setTodos] = useState<Todo[]>([
-    { id: '1', title: 'Finish mobile app design', completed: false },
-    { id: '2', title: 'Call the doctor at 3pm', completed: true },
-    { id: '3', title: 'Buy groceries for the week', completed: false },
-  ]);
+  const { user } = useAuth();
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const addTodo = (title: string) => {
-    const newTodo: Todo = {
-      id: Date.now().toString(),
-      title,
-      completed: false,
-    };
-    setTodos(prev => [newTodo, ...prev]);
+  const fetchTodos = useCallback(async (date: string) => {
+    if (!user?.id) return;
+    setIsLoading(true);
+    const result = await todoService.getTodosByDate(user.id, date);
+    if (result.status === "ok") {
+      setTodos(result.data);
+    }
+    setIsLoading(false);
+  }, [user?.id]);
+
+  const addTodo = async (title: string, date: string) => {
+    if (!user?.id) return;
+    const result = await todoService.addTodo(user.id, title, date);
+    if (result.status === "ok") {
+      setTodos(prev => [result.data, ...prev]);
+    }
   };
 
-  const toggleTodo = (id: string) => {
-    setTodos(prev => prev.map(todo => 
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ));
+  const toggleTodo = async (id: number) => {
+    const result = await todoService.toggleTodo(id);
+    if (result.status === "ok") {
+      setTodos(prev => prev.map(todo => 
+        todo.id === id ? result.data : todo
+      ));
+    }
   };
 
-  const deleteTodo = (id: string) => {
-    setTodos(prev => prev.filter(todo => todo.id !== id));
+  const deleteTodo = async (id: number) => {
+    const result = await todoService.deleteTodo(id);
+    if (result.status === "ok") {
+      setTodos(prev => prev.filter(todo => todo.id !== id));
+    }
   };
 
   return (
-    <TodoContext.Provider value={{ todos, addTodo, toggleTodo, deleteTodo }}>
+    <TodoContext.Provider value={{ todos, isLoading, fetchTodos, addTodo, toggleTodo, deleteTodo }}>
       {children}
     </TodoContext.Provider>
   );
