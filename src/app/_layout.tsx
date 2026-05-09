@@ -1,8 +1,22 @@
+import { initDatabase } from "@/db/schema";
 import { Stack } from "expo-router";
+import { useEffect, useState } from "react";
 import { AuthProvider } from "../context/auth-context";
 import { TodoProvider } from "../context/todo-context";
 
 export default function RootLayout() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const setup = async () => {
+      await initDatabase();
+      setReady(true);
+    };
+
+    setup();
+  }, []);
+
+  if (!ready) return null;
   return (
     <AuthProvider>
       <TodoProvider>

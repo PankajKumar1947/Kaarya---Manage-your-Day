@@ -12,14 +12,19 @@ import { useAuth } from '../context/auth-context';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, isLoading } = useAuth();
-  const [email, setEmail] = useState('elementary221b@gmail.com');
+  const { user, login, isLoading } = useAuth();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = async () => {
-    if (email) {
-      await login(email);
+  React.useEffect(() => {
+    if (user) {
       router.replace('/home');
+    }
+  }, [user]);
+
+  const handleLogin = async () => {
+    if (email && password) {
+      await login(email, password);
     }
   };
 
@@ -34,7 +39,7 @@ export default function LoginScreen() {
       <View style={styles.form}>
         <AppInput 
           label="Email Address" 
-          placeholder="elementary221b@gmail.com" 
+          placeholder="Enter your email..." 
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"

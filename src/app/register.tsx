@@ -6,17 +6,23 @@ import { AppInput } from '../components/app-input';
 import { AppLogo } from '../components/app-logo';
 import { AppText } from '../components/app-text';
 import { ScreenContainer } from '../components/screen-container';
-import { Colors } from '../theme/colors';
 import { useAuth } from '../context/auth-context';
+import { Colors } from '../theme/colors';
 
 export default function RegisterScreen() {
+  const { user, register, isLoading } = useAuth();
   const router = useRouter();
-  const { register, isLoading } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    if (user) {
+      router.replace('/home');
+    }
+  }, [user]);
 
   const handleSignUp = async () => {
     if (!name) {
@@ -25,8 +31,7 @@ export default function RegisterScreen() {
       setError('ERROR: Password do not match!');
     } else if (email && password) {
       setError('');
-      await register(email, name);
-      router.replace('/home');
+      await register(name, email, password);
     }
   };
 

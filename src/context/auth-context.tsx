@@ -1,15 +1,17 @@
+import { authService } from '@/services/auth.service';
+import { storageService } from '@/services/storage.service';
+import { User } from '@/types';
+import { useRouter } from 'expo-router';
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Alert } from 'react-native';
 
-interface User {
-  email: string;
-  name: string;
-}
+const AUTH_STORAGE_KEY = '@kaarya_user';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, name?: string) => Promise<void>;
-  register: (email: string, name: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -17,26 +19,56 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
-  const login = async (email: string, name?: string) => {
+  // Load user from storage on mount
+  useEffect(() => {
+    const loadUser = async () => {
+      const storedUser = await storageService.getItem<User>(AUTH_STORAGE_KEY);
+      if (storedUser) {
+        setUser(storedUser);
+      }
+      setIsLoading(false);
+    };
+
+    loadUser();
+  }, []);
+
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setUser({ email, name: name || email.split('@')[0] });
+    const result = await authService.login(email, password);
+    
+    if (result.status === "ok") {
+      const userData = result.data;
+      setUser(userData);
+      await storageService.setItem(AUTH_STORAGE_KEY, userData);
+      router.replace('/home');
+    } else {
+      Alert.alert("Login Failed", result.message);
+    }
     setIsLoading(false);
   };
 
-  const register = async (email: string, name: string) => {
+  const register = async (name: string, email: string, password: string) => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setUser({ email, name });
+    const result = await authService.signup(name, email, password);
+    
+    if (result.status === "ok") {
+      const userData = result.data;
+      setUser(userData);
+      await storageService.setItem(AUTH_STORAGE_KEY, userData);
+      router.replace('/home');
+    } else {
+      Alert.alert("Registration Failed", result.message);
+    }
     setIsLoading(false);
   };
 
-  const logout = () => {
+  const logout = async () => {
     setUser(null);
+    await storageService.removeItem(AUTH_STORAGE_KEY);
+    router.replace('/login');
   };
 
   return (
