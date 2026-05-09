@@ -6,7 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
-  Modal
+  Modal,
+  Alert
 } from 'react-native';
 import { AppText } from '../components/app-text';
 import { ScreenContainer } from '../components/screen-container';
@@ -67,25 +68,46 @@ export default function HomeScreen() {
     setIsMonthPickerVisible(false);
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      "Logout",
+      "Are you sure you want to logout?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Logout", style: "destructive", onPress: logout }
+      ]
+    );
+  };
+
   const isAddDisabled = !selectedDateKey;
 
   return (
     <ScreenContainer style={styles.container}>
       <View style={styles.header}>
         <View style={styles.topRow}>
-          <TouchableOpacity style={styles.profileBtn} onPress={logout}>
+          <View style={styles.profileSection}>
             <Ionicons name="person-circle-outline" size={40} color={Colors.primary} />
-          </TouchableOpacity>
-          <View style={styles.userInfo}>
-            <AppText variant="caption">Welcome back,</AppText>
-            <AppText bold style={{ fontSize: 18 }}>{user?.name || 'User'}</AppText>
+            <View style={styles.userInfo}>
+              <AppText variant="caption">Welcome back,</AppText>
+              <AppText bold style={{ fontSize: 18 }}>{user?.name || 'User'}</AppText>
+            </View>
           </View>
-          <TouchableOpacity 
-            style={styles.calendarBtn}
-            onPress={() => setIsMonthPickerVisible(true)}
-          >
-            <Ionicons name="calendar-outline" size={24} color={Colors.textPrimary} />
-          </TouchableOpacity>
+          
+          <View style={styles.headerActions}>
+            <TouchableOpacity 
+              style={styles.actionBtn}
+              onPress={() => setIsMonthPickerVisible(true)}
+            >
+              <Ionicons name="calendar-outline" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.actionBtn}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={24} color={Colors.error} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.daySelectorContainer}>
@@ -227,16 +249,24 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 20,
     paddingHorizontal: 18,
   },
-  userInfo: {
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
+  },
+  userInfo: {
     marginLeft: 12,
   },
-  profileBtn: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  calendarBtn: {
+  actionBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
